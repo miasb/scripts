@@ -27,7 +27,6 @@ my $magnet_sweep = sweep(
 
 my $meas = sub {
     my $sweep = shift;
-    my $field = $ips->get_field();
 };
 
 $sweep->start(
