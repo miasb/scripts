@@ -2,13 +2,17 @@ use v5.20;
 use warnings;
 use strict;
 
-use Lab::Measurement;
+use Lab::Moose;
 use Carp;
 
 use Lab::Moose::Connection::VISA_GPIB;
 
+# measure the time
+use Time::HiRes qw/time/;
+
 #--------preample---------
 
+my $start_time = time();
 #my $vorwiderstand = 100000;
 my $ithaco_sens=1E-5; #die sensitivity am Ithaco
 my $femto_DC=1000;  #femtos
@@ -145,16 +149,16 @@ my $LAKE = instrument(
 
 my $gate_sweep = sweep(
 	type       => 'Step::Voltage',
-	instrument => $YOKO_gate,
+	instrument => $YOKO_GATE,
 	delay_before_loop => 5,
 	backsweep => 0,
     # step
-	#points => [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
-	#steps => [1],
+	# points => [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
+	# steps => [1],
 	list => [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
     # continuous
-	interval => 2,
-	rates => [0.04]
+	# interval => 2,
+	# rates => [0.04]
 );
 
 
@@ -162,23 +166,22 @@ my $magnet_sweep = sweep(
 	type       => 'Continuous::Magnet',
 	instrument => $IPS,
 	delay_before_loop => 5,
-	backsweep => 0,
+	backsweep => 1,
     
-	points => [-0.003, 0.055], #1 flussquant pro Antidot bei 0.005754T
-	# step
-	steps => [0.0015], 
+	points => [-1, 1], #1 flussquant pro Antidot bei 0.005754T
+	# # step
+	# steps => [0.0015], 
     # continuous
-	interval => 3,
-	rates => [0.010, 0.002] #0.05
+	intervals => [3],
+	rates => [0.1] #0.05
 );
 
 my $temp_sweep = sweep(
     type        => 'Step::Temperature',
     instrument  => $ITC,
     sensor      => $LAKE,
-
-	points  => [3.845, 4.8, 4.75, 4.75, 4.7, 4.7, 4.65, 4.65, 4.6, 4.6], #gap bei ??
-	steps   => [0.050],
+	points  => [7.5,2.5], #gap bei ??
+	steps   => [0.5],
 
 	observation_time    => 5*60,		
 	tolerance_setpoint  => 0.050, #gilt fürs ITC			
@@ -204,7 +207,6 @@ my $file = sweep_datafile(
                 I_AC
                 dR_l
                 dR_r
-                HE
                 /]
         # columns => [qw/ TIME T_VTI T_SAMPLE B U_gate U_AC U_AC_CURRENT U_AC_4PT_l U_AC_4PT_r I_AC dR_l dR_r HE U_DC U_CURRENT I U_DC_4PT_xx R_SAMPLE_xx /]
 );
@@ -216,7 +218,7 @@ $file->add_plot(
 	y => 'dR_l',
 	plot_options => {
 		title   => 'dR_l vs B',
-        type    => 'point',
+        # type    => 'point',
         grid    => 'xtics ytics',
         format  => {x => "'%1.3f'", y => "'%1.2f'"},
 	},
@@ -229,7 +231,7 @@ $file->add_plot(
 	y => 'dR_r',
 	plot_options => {
 		title   => 'dR_r vs B',
-        type    => 'point',
+        # type    => 'point',
         grid    => 'xtics ytics',
         format  => {x => "'%1.3f'", y => "'%1.2f'"},
 	},
@@ -312,14 +314,14 @@ $file->add_plot(
 	hard_copy => 'T_SAMPLE-vs-TIME.png'
 );
 
-$file->add_plot(
-	x => 'TIME',
-	y => 'HE',
-	plot_options => {
-		title   => 'HE vs TIME',
-	},
-	hard_copy => 'HE-vs-TIME.png'
-);
+# $file->add_plot(
+	# x => 'TIME',
+	# y => 'HE',
+	# plot_options => {
+		# title   => 'HE vs TIME',
+	# },
+	# hard_copy => 'HE-vs-TIME.png'
+# );
 
 
 #-------------------------------------------------------------
@@ -329,13 +331,13 @@ $file->add_plot(
 my $measurement = sub {
 
 	my $sweep = shift;
-	my $time = $sweep->{Time};
+	my $time = time()-$start_time;
 	
-	my $he_level = $IPS->get_level();
+	# my $he_level = $IPS->get_level();
 	
-	my $U_gate = $YOKO_gate->get_level(); #topgate voltage
-	my $t_sample = $lake->get_value(channel =>'B');
-	my $t_vti = $ITC->get_value(1);
+	my $U_gate = $YOKO_GATE->get_level(); #topgate voltage
+	my $t_sample = $LAKE->get_value(channel =>'A');
+	my $t_vti = $ITC->get_value();
 	
 	my $b =$IPS->get_value();
 
@@ -361,10 +363,10 @@ my $measurement = sub {
 	
 	
 	my $U_AC_4pt_l = $LOCKIN_SAMPLE_l->get_value(channel => 'X');
-	my $U_AC_4pt_l = $U_AC_4pt_l / $femto_AC;
+	 $U_AC_4pt_l = $U_AC_4pt_l / $femto_AC;
 	
 	my $U_AC_4pt_r = $LOCKIN_SAMPLE_r->get_value(channel => 'X');
-	my $U_AC_4pt_r = $U_AC_4pt_r / $femto_AC;
+	 $U_AC_4pt_r = $U_AC_4pt_r / $femto_AC;
 	
 	my $i_AC = $u_AC_CURRENT*$ithaco_sens;
 	
@@ -374,13 +376,13 @@ my $measurement = sub {
 	
 
 	
-	$sweep->LOG({
+	$sweep->log(
 	
 		TIME => $time,
 		T_VTI => $t_vti,
 		T_SAMPLE => $t_sample,
 		
-		HE => $he_level,
+		# HE => $he_level,
 		
 		B => $b,
 		U_gate => $U_gate,
@@ -400,7 +402,7 @@ my $measurement = sub {
 	
 		dR_l => $dR_l,
 		dR_r => $dR_r,	
-	});
+	);
 	
 };
 
@@ -425,7 +427,7 @@ my $measurement = sub {
 
 #-----------------------------------------------------------------------------
 
-$gate_sweep->start(
+$temp_sweep->start(
     slave       => $magnet_sweep,
     measurement => $measurement,
     datafile    => $file
