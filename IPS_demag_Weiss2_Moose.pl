@@ -25,10 +25,16 @@ my $magnet_sweep = sweep(
     backsweep         => 0,
 );
 
+my $file = sweep_datafile(
+    filename = 'remove_me.dat',
+    columns  = [qw/help/]
+);
+
 my $meas = sub {
     my $sweep = shift;
 };
 
-$sweep->start(
+$magnet_sweep->start(
     measurement => $meas,
+    datafile    => $file
 );
