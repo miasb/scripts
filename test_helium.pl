@@ -3,21 +3,8 @@ use warnings;
 use strict;
 use Lab::Moose;
 use Carp;
-use Lab::Moose::Connection::VISA_GPIB;
 
 
-# Devices
-my $isobus = Lab::Moose::Connection::VISA_GPIB->new(pad => 24);
-my $ips = instrument(
-	type => 'OI_IPS',
-	connection_type => 'IsoBus',
-	connection_options => {
-		base_connection => $isobus,
-		isobus_address => 2
-	},
-	max_field_rates => [1],
-	max_fields => [9],
-);
 
 # HELIUM
 # ======
@@ -33,12 +20,36 @@ my $ips = instrument(
 # the UID would be DB4 in this case.
 # The level can then be read using
 # READ:DEV:DB4 :LVL:HEL:LEV?
+# The SCPI driver for all Oxford Instruments Mercury magnet power supplies is
+# Lab::Moose::Instrument::OI_Mercury::Magnet
+# my $IPS = instrument(
+#     type => 'OI_Mercury::Magnet',
 
-my $uids = $ips->query( command => "READ:SYS:CAT?");
+# Devices
+my $ips = instrument(
+	type => 'OI_Mercury::Magnet',
+	connection_type => 'Socket',
+	connection_options => {
+		host => 'ip',
+	},
+	magnet => 'Z',  # X, Y or Z. Z is default.
+);
 
+# returns the hardware configuration of the iPS
+# ... get the level sensors UID
+
+my $sensors = $ips->get_catalogue();
 
 # Set to HOLD
 # ===========
-# The iPS can be set to hold by calling set_activity(0)
-# How to set to HOLD when scripts are terminated manually?
+# The iPS can be set to hold by calling oim_set_activity()
+# The possible values are:
+# - HOLD    hold current
+# - RTOS    ramp to set point
+# - RTOZ    rampt to zero
+# - CLMP    clamp output if current is zero
+
+$ips->oim_set_activity(value => 'HOLD');
+
+
 

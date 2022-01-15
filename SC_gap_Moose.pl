@@ -105,15 +105,16 @@ my $LOCKIN_SAMPLE_r = instrument(
 my $isobus = Lab::Moose::Connection::VISA_GPIB->new(pad => 24);
 
 my $IPS = instrument(
-	type => 'OI_IPS',
-	connection_type => 'IsoBus',
+	type => 'OI_Mercury::Magnet',
+	connection_type => 'Socket',
 	connection_options => {
-		base_connection => $isobus,
-		isobus_address => 2
+		host => 'ip',
 	},
-	max_field_rates => [1],
-	max_fields => [9],
+	magnet => 'Z',  # X, Y or Z. Z is default.
 );
+# The iPS continues the last sweep, if it is not on hold
+# when this script starts the measurement.
+$IPS->oim_set_activity(value => 'HOLD');
  
 my $ITC = instrument(
 	type => 'OI_ITC503',
@@ -332,21 +333,22 @@ my $measurement = sub {
 
 	my $sweep = shift;
 	my $time = time()-$start_time;
-	
-	# my $he_level = $IPS->get_level();
+
+    # Gets the current helium level 
+    # The UID of the sensor can be obtained by running
+    # $IPS->get_catalogue()
+    # and has the form DEV:<UID>:L1:LVL
+	my $he_level = $IPS->get_he_level(channel => 'UID');
 	
 	my $U_gate = $YOKO_GATE->get_level(); #topgate voltage
 	my $t_sample = $LAKE->get_value(channel =>'A');
 	my $t_vti = $ITC->get_value();
 	
-	my $b =$IPS->get_value();
-
+	my $b =$IPS->oim_get_field();
 
 
 	# my $u_DC = $YOKO_SD->get_level();			# U I R R
 	# my $U_DC_current = $Multimeter_I->get_value();
-		
-
 
 	# my $U_DC_4pt_xx = $Multimeter_Sample_xx->get_value(1);
 	# my $U_DC_4pt_xx = $U_DC_4pt_xx / $femto_DC;
@@ -406,10 +408,12 @@ my $measurement = sub {
 	
 };
 
+# This part should be obsolete, since the iPS handles
+# the level control automatically
 #-------- 5. Helium level control -------
 
 # my $check_helium = sub {
-# 	my $he_level = $IPS->get_level();
+# 	my $he_level = $IPS->get_he_level(channel => 'UID');
 # 	print "\n\n\nHelium check: Level = $he_level ... ";
 # 	if ($he_level <= 8) {
 # 		print "\n\nLow Helium Level! Sweep to zero and enable persistent mode \n";
